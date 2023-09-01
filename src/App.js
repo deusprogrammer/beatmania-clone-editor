@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import songChart from './chart';
+import WaveSurfer from 'wavesurfer.js';
 import './App.css';
+
 
 let ctx;
 let audioSource;
@@ -14,16 +16,35 @@ const App = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [chart, setChart] = useState([]);
+    const [audioBase64, setAudioBase64] = useState('');
 
     const editorWindow = useRef();
 
     useEffect(() => {
+        if (!audioBuffer) {
+            return;
+        }
+
         setChart(songChart);
-    }, [audioBuffer]);
+
+        if (!audioBase64) {
+            return;
+        }
+
+        let wavesurfer = WaveSurfer.create({
+            container: document.getElementById('audio-canvas'),
+            waveColor: '#4F4A85',
+            progressColor: '#4F4A85',
+            vertical: true,
+        });
+
+        wavesurfer.load(audioBase64);
+    }, [audioBuffer, audioBase64]);
 
     const onFileLoad = (event) => {
         setIsLoading(true);
         let fr = new FileReader();
+        let frBase64 = new FileReader();
         let file = event.target.files[0];
         
         fr.addEventListener("load", async ({target: {result}}) => {
@@ -33,7 +54,12 @@ const App = () => {
             setIsLoading(false);
         });
 
+        frBase64.addEventListener("load", async ({target: {result}}) => {
+            setAudioBase64(result);
+        });
+
         fr.readAsArrayBuffer(file);
+        frBase64.readAsDataURL(file);
     }
 
     const onPlay = () => {
@@ -120,6 +146,10 @@ const App = () => {
 
         console.log(`${column}@${ms}ms`);
 
+        if (column > 4) {
+            return;
+        }
+
         let index = Math.trunc(ms/1000);
         let chartCopy = [...chart];
         chartCopy[index] = [...chart[index]];
@@ -133,7 +163,7 @@ const App = () => {
 
     return <div style={{backgroundColor: 'black', color: 'white'}}>
         <div>
-            <input type='file' onChange={onFileLoad} />
+            <input type='file' onChange={onFileLoad} disabled={audioBuffer} />
             <br />
             {isLoading ? <div>Loading Audio...</div> : null}
             {audioBuffer ? 
@@ -142,8 +172,8 @@ const App = () => {
                 </>: 
                 null}
             {audioBuffer ? <div id="editorWindow" style={{position: 'relative', height: 'calc(100vh - 42px)', width: '100vw', overflowY: 'scroll', overflowX: 'hidden', transform: 'scaleY(-1)'}} ref={editorWindow} onScroll={onScroll} onClick={onPause}>
-                <div style={{height: `${audioBuffer.duration * 1000}px`}} onMouseDown={placeBeat}>
-                    {chart.map((second, index) => {
+                <div style={{height: `${Math.trunc(audioBuffer.duration * 1000)}px`}} onMouseDown={placeBeat}>
+                    {chart.map((second) => {
                         if (!second) {
                             return null;
                         }
@@ -152,6 +182,7 @@ const App = () => {
                         });
                     })}
                 </div>
+                <div id='audio-canvas' style={{display: 'flex', position: 'absolute', top: 'calc(50% + 16px)', right: '0px', width: '200px', height: `${Math.trunc(audioBuffer.duration * 1000)}px`}} />
             </div> : null}
             <div style={{position: 'fixed', borderBottom: '1px solid white', width: '100%', top: 'calc(100vh - 50%)', left: '0px'}} />
         </div>
