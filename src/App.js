@@ -13,10 +13,12 @@ let skipNextScrollEvent = false;
 
 const App = () => {
     const [audioBuffer, setAudioBuffer] = useState(null);
+    const [audioBase64, setAudioBase64] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+
     const [chart, setChart] = useState([]);
-    const [audioBase64, setAudioBase64] = useState('');
+    const [bpm, setBpm] = useState(120);
 
     const editorWindow = useRef();
 
@@ -161,16 +163,57 @@ const App = () => {
         setChart(chartCopy);
     }
 
+    const createLineTimings = (bpm, duration) => {
+        let lineTimings = [];
+        let bps = bpm / 60;
+        for (let beat = 0; beat < Math.ceil(bpm * duration/60); beat++) {
+            for (let i = 0; i < 16; i++) {
+                let color;
+                switch (i) {
+                    case 0:
+                        color = '#ffff00';
+                        break;
+                    case 8:
+                        color = '#00ff00';
+                        break;
+                    case 4:
+                    case 12:
+                        color = '#00ffff';
+                        break;
+                    default:
+                        color = '#ff00ff';
+                }
+                lineTimings.push({
+                    ms: beat * (1000 / bps) + i * (1000 / bps / 16),
+                    color,
+                });
+            }
+        }
+
+        console.log(JSON.stringify(lineTimings, null, 5));
+
+        return lineTimings;
+    }
+
+    let lines = [];
+
+    if (audioBuffer) {
+        lines = createLineTimings(bpm, audioBuffer.duration);
+    }
+
     return <div style={{backgroundColor: 'black', color: 'white'}}>
         <div>
-            <input type='file' onChange={onFileLoad} disabled={audioBuffer} />
-            <br />
-            {isLoading ? <div>Loading Audio...</div> : null}
-            {audioBuffer ? 
-                <>
-                    {isPlaying ? <button onClick={onPause}>Pause</button> : <button onClick={onPlay}>Play</button>}
-                </>: 
-                null}
+            <div style={{height: '44px'}}>
+                <input type='file' onChange={onFileLoad} disabled={audioBuffer} />
+                <label>BPM</label><input type='number' onChange={({target: {value}}) => {setBpm(value)}} value={bpm} />
+                {isLoading ? <div>Loading Audio...</div> : null}
+                <br />
+                {audioBuffer ? 
+                    <>
+                        {isPlaying ? <button onClick={onPause}>Pause</button> : <button onClick={onPlay}>Play</button>}
+                    </>: 
+                    null}
+            </div>
             {audioBuffer ? <div id="editorWindow" style={{position: 'relative', height: 'calc(100vh - 42px)', width: '100vw', overflowY: 'scroll', overflowX: 'hidden', transform: 'scaleY(-1)'}} ref={editorWindow} onScroll={onScroll} onClick={onPause}>
                 <div style={{height: `${Math.trunc(audioBuffer.duration * 1000)}px`}} onMouseDown={placeBeat}>
                     {chart.map((second) => {
@@ -181,10 +224,13 @@ const App = () => {
                             return <div key={`${column}-${ms}`} style={{position: 'absolute', width: '128px', height: end ? `${end - ms}px` : '32px', top: `calc(${ms}px + 50% - 16px)`, left: column * 128 + 'px', backgroundColor: end ? 'blue' : 'red'}} />
                         });
                     })}
+                    {lines.map(({ms, color}) => {
+                        return <div key={`line-${ms}`} style={{position: 'absolute', width: `${128 * 5}px`, height: 1, top: `calc(${ms}px + 50%)`, left: '0px', backgroundColor: color}} />
+                    })}
                 </div>
-                <div id='audio-canvas' style={{display: 'flex', position: 'absolute', top: 'calc(50% + 16px)', right: '0px', width: '200px', height: `${Math.trunc(audioBuffer.duration * 1000)}px`}} />
+                <div id='audio-canvas' style={{display: 'flex', position: 'absolute', top: 'calc(50% - 44px)', right: '0px', width: '200px', height: `${Math.trunc(audioBuffer.duration * 1000)}px`}} />
             </div> : null}
-            <div style={{position: 'fixed', borderBottom: '1px solid white', width: '100%', top: 'calc(100vh - 50%)', left: '0px'}} />
+            <div style={{position: 'fixed', backgroundColor: 'white', height: '1px', width: '100%', top: 'calc(100vh - 50% + 22px)', left: '0px'}} />
         </div>
     </div>
 }
